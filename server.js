@@ -82,10 +82,11 @@ const puzzlePools = {
   hard:   { pool: 0, entries: new Map(), activePuzzles: [] },
 };
 
-// Lichess live channels cache
-let lichessChannels = null;
-let lichessChannelsTs = 0;
-const LICHESS_CACHE_MS = 30000;
+// Lichess live sportsbook state
+const TRACKED_CHANNELS = ['Top', 'Bullet', 'Blitz', 'Rapid', 'Classical', 'Chess960'];
+const liveSportsbookGames = new Map();   // channelName → { gameId, fen, lastMove, players, clocks, whiteBets, blackBets }
+const sportsbookWatchers = new Set();    // wsIds currently watching sportsbook
+const activeChannelStreams = new Map();  // channelName → AbortController
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateId() {
@@ -346,22 +347,142 @@ function handleSpectatorBet(wsId, msg) {
   broadcastRoom(gameId, { type: 'odds_update', gameId, whitePool: totalWhite, blackPool: totalBlack });
 }
 
-// ─── Lichess Sportsbook ───────────────────────────────────────────────────────
-async function getLichessChannels() {
-  const now = Date.now();
-  if (lichessChannels && now - lichessChannelsTs < LICHESS_CACHE_MS) return lichessChannels;
-  try {
-    const res = await fetch('https://lichess.org/api/tv/channels', {
-      headers: { Accept: 'application/json' },
+// ─── Lichess Live Sportsbook Streaming ───────────────────────────────────────
+
+function sportsbookPayload(channelName) {
+  const g = liveSportsbookGames.get(channelName);
+  if (!g) return null;
+  const totalW = g.whiteBets.reduce((s, b) => s + b.amount, 0);
+  const totalB = g.blackBets.reduce((s, b) => s + b.amount, 0);
+  return {
+    type: 'sportsbook_update',
+    channelName,
+    gameId: g.gameId,
+    fen: g.fen,
+    lastMove: g.lastMove,
+    players: g.players,
+    clocks: g.clocks,
+    whitePool: totalW,
+    blackPool: totalB,
+  };
+}
+
+function broadcastSportsbookUpdate(channelName) {
+  if (!sportsbookWatchers.size) return;
+  const payload = sportsbookPayload(channelName);
+  if (payload) broadcast([...sportsbookWatchers], payload);
+}
+
+function handleLichessEvent(channelName, msg) {
+  if (msg.t === 'featured') {
+    const { id, players, fen, orientation } = msg.d;
+    const white = (players || []).find(p => p.color === 'white') || {};
+    const black = (players || []).find(p => p.color === 'black') || {};
+
+    // When a new game starts on this channel, carry over bets only if same gameId
+    const existing = liveSportsbookGames.get(channelName);
+    const whiteBets = (existing && existing.gameId === id) ? existing.whiteBets : [];
+    const blackBets = (existing && existing.gameId === id) ? existing.blackBets : [];
+
+    liveSportsbookGames.set(channelName, {
+      gameId: id,
+      channelName,
+      fen: fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      lastMove: null,
+      players: {
+        white: { name: white.user?.name || '?', rating: white.rating || 0 },
+        black: { name: black.user?.name || '?', rating: black.rating || 0 },
+      },
+      clocks: {
+        w: typeof white.seconds === 'number' ? white.seconds : 300,
+        b: typeof black.seconds === 'number' ? black.seconds : 300,
+      },
+      whiteBets,
+      blackBets,
     });
-    if (!res.ok) return lichessChannels;
-    lichessChannels = await res.json();
-    lichessChannelsTs = now;
-    return lichessChannels;
-  } catch (e) {
-    console.warn('[sportsbook] Lichess fetch failed:', e.message);
-    return lichessChannels;
+    broadcastSportsbookUpdate(channelName);
+
+  } else if (msg.t === 'fen') {
+    const game = liveSportsbookGames.get(channelName);
+    if (!game) return;
+    game.fen = msg.d.fen || game.fen;
+    game.lastMove = msg.d.lm || null;
+    // Lichess sends centiseconds
+    if (typeof msg.d.wc === 'number') game.clocks.w = Math.floor(msg.d.wc / 100);
+    if (typeof msg.d.bc === 'number') game.clocks.b = Math.floor(msg.d.bc / 100);
+    broadcastSportsbookUpdate(channelName);
   }
+}
+
+async function startChannelStream(channelName) {
+  if (activeChannelStreams.has(channelName)) return;
+  const controller = new AbortController();
+  activeChannelStreams.set(channelName, controller);
+
+  try {
+    const res = await fetch(`https://lichess.org/api/tv/${channelName}/feed`, {
+      headers: { Accept: 'application/x-ndjson' },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      console.warn(`[sportsbook] Channel ${channelName} returned ${res.status}`);
+      activeChannelStreams.delete(channelName);
+      setTimeout(() => startChannelStream(channelName), 15000);
+      return;
+    }
+
+    let buf = '';
+    res.body.on('data', chunk => {
+      buf += chunk.toString();
+      const lines = buf.split('\n');
+      buf = lines.pop(); // keep any incomplete line
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try { handleLichessEvent(channelName, JSON.parse(trimmed)); } catch (_) {}
+      }
+    });
+
+    res.body.on('end', () => {
+      activeChannelStreams.delete(channelName);
+      setTimeout(() => startChannelStream(channelName), 5000);
+    });
+
+    res.body.on('error', err => {
+      if (err.name !== 'AbortError') console.warn(`[sportsbook] Stream error ${channelName}:`, err.message);
+      activeChannelStreams.delete(channelName);
+      setTimeout(() => startChannelStream(channelName), 10000);
+    });
+
+  } catch (err) {
+    if (err.name !== 'AbortError') console.warn(`[sportsbook] Connect error ${channelName}:`, err.message);
+    activeChannelStreams.delete(channelName);
+    setTimeout(() => startChannelStream(channelName), 15000);
+  }
+}
+
+function initSportsbookStreams() {
+  // Stagger starts to avoid hammering Lichess at once
+  TRACKED_CHANNELS.forEach((ch, i) => {
+    setTimeout(() => startChannelStream(ch), i * 1500);
+  });
+}
+
+// Handle sportsbook bets (now stored inside liveSportsbookGames)
+function handleSportsbookBet(wsId, msg) {
+  const { channelName, side, amount } = msg;
+  const game = liveSportsbookGames.get(channelName);
+  if (!game) { send(wsId, { type: 'error', msg: 'Channel not found' }); return; }
+
+  const amt = parseFloat(amount) || 0;
+  if (amt <= 0) { send(wsId, { type: 'error', msg: 'Invalid amount' }); return; }
+
+  if (side === 'white') game.whiteBets.push({ wsId, amount: amt });
+  else game.blackBets.push({ wsId, amount: amt });
+
+  send(wsId, { type: 'bet_placed', channelName, side, amount: amt });
+  broadcastSportsbookUpdate(channelName);
 }
 
 // ─── Daily Puzzle ─────────────────────────────────────────────────────────────
@@ -668,6 +789,19 @@ wss.on('connection', (ws) => {
         handleSportsbookBet(wsId, msg);
         break;
 
+      case 'watch_sportsbook':
+        sportsbookWatchers.add(wsId);
+        // Send current state for all tracked channels immediately
+        for (const ch of TRACKED_CHANNELS) {
+          const payload = sportsbookPayload(ch);
+          if (payload) send(wsId, payload);
+        }
+        break;
+
+      case 'unwatch_sportsbook':
+        sportsbookWatchers.delete(wsId);
+        break;
+
       case 'enter_daily': {
         const c = clients.get(wsId);
         if (c) c.inDaily = true;
@@ -723,6 +857,8 @@ wss.on('connection', (ws) => {
         const specSet = spectators.get(c.roomId);
         if (specSet) specSet.delete(wsId);
       }
+      // Remove from sportsbook watchers
+      sportsbookWatchers.delete(wsId);
     }
     clients.delete(wsId);
   });
@@ -732,14 +868,12 @@ wss.on('connection', (ws) => {
 
 // ─── REST API ─────────────────────────────────────────────────────────────────
 
-// Lichess channels proxy
-app.get('/api/sportsbook/channels', async (req, res) => {
-  try {
-    const channels = await getLichessChannels();
-    res.json(channels || {});
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+// Live sportsbook state (all tracked channels)
+app.get('/api/sportsbook/live', (req, res) => {
+  const games = TRACKED_CHANNELS
+    .map(ch => sportsbookPayload(ch))
+    .filter(Boolean);
+  res.json(games);
 });
 
 // Daily puzzle
@@ -827,5 +961,8 @@ server.listen(PORT, () => {
     if (p) console.log('[daily] Puzzle loaded:', p.id);
     else console.warn('[daily] Could not load puzzle at startup');
   });
+  // Start Lichess TV streams
+  initSportsbookStreams();
+  console.log('[sportsbook] Connecting to Lichess TV channels:', TRACKED_CHANNELS.join(', '));
   scheduleDailyPuzzleRefresh();
 });
