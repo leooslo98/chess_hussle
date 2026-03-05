@@ -2093,6 +2093,7 @@ async function doConnectSolana(provider,walletName){
     nb.className='net-badge '+(SOLANA_NETWORK==='devnet'?'devnet':'mainnet');
     closeModal('walletModal');
     toast(`${walletName} connected — ${solBal} SOL`,'success');
+    if(wsConnected)wsSend({type:'identify',walletAddress:walletPubkey.toString()});
     provider.on?.('disconnect',()=>onWalletDisconnect());
     provider.on?.('accountChanged',(newKey)=>{if(!newKey)onWalletDisconnect();else window.location.reload();});
   }catch(err){
@@ -3497,15 +3498,6 @@ function findMoveFromStr(board, legalMoves, moveStr, color) {
 // ═══════════════════════════════════════════════════════════════════
 // INIT NEW FEATURES
 // ═══════════════════════════════════════════════════════════════════
-// Update WS identity when wallet connects
-const _origDoConnectSolana = doConnectSolana;
-async function doConnectSolana(provider, walletName) {
-  await _origDoConnectSolana(provider, walletName);
-  if (walletPubkey && wsConnected) {
-    wsSend({ type: 'identify', walletAddress: walletPubkey.toString() });
-  }
-}
-
 // Auto-refresh live games every 15s when on play view
 setInterval(() => {
   if (document.getElementById('view-play')?.classList.contains('active')) refreshLiveGames();
