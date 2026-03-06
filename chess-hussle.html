@@ -573,6 +573,20 @@ footer{border-top:1px solid var(--border);padding:28px 48px;display:flex;justify
       </div>
       <button class="btn-gold queue-btn" id="joinQueueBtn" onclick="toggleQueue()">Join Queue</button>
       <div style="margin-top:16px;font-size:10px;color:var(--muted);line-height:1.8;text-align:center;" id="queueInfo"></div>
+
+      <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px;">
+        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Challenge a Friend</div>
+        <button class="btn-out" style="width:100%;margin-bottom:10px;" onclick="createChallenge()">Create Invite Code</button>
+        <div id="challengeDisplay" style="display:none;background:var(--surface2);border:1px solid var(--gold-dim);padding:12px;text-align:center;margin-bottom:10px;">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:4px;">Your code (10 min)</div>
+          <div id="challengeCodeTxt" style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:8px;color:var(--gold);"></div>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;">Share this with your friend</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input class="fi" id="friendCodeInput" placeholder="Enter friend's code" maxlength="6" style="text-transform:uppercase;letter-spacing:3px;">
+          <button class="btn-gold" style="padding:10px 14px;font-size:10px;white-space:nowrap;" onclick="joinChallenge()">Join</button>
+        </div>
+      </div>
     </div>
     <div>
       <div class="sec-tag">Live Games</div>
@@ -2572,6 +2586,35 @@ function leaveQueue() {
 
 function updateQueueUI(msg) {
   document.getElementById('queueInfo').textContent = `Position ${msg.position} in queue — est. ${msg.eta}s`;
+}
+
+// ─── Friend Challenge (invite by code) ───────────────────────────
+async function createChallenge() {
+  if (!wsConnected) { toast('Connecting to server…', 'warn'); connectWS(); return; }
+  const wager = parseFloat(document.getElementById('playWager').value) || 0.1;
+  try {
+    const r = await fetch('/api/challenge/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wsId, wager, timeControl: _queueTC }),
+    });
+    const data = await r.json();
+    if (!data.code) { toast('Server error — try again', 'error'); return; }
+    document.getElementById('challengeCodeTxt').textContent = data.code;
+    document.getElementById('challengeDisplay').style.display = 'block';
+    try { await navigator.clipboard.writeText(data.code); toast('Code ' + data.code + ' — copied to clipboard!', 'success'); }
+    catch { toast('Code: ' + data.code + ' — share this with your friend', 'success'); }
+  } catch (e) {
+    toast('Could not create challenge', 'error');
+  }
+}
+
+function joinChallenge() {
+  const code = (document.getElementById('friendCodeInput').value || '').trim().toUpperCase();
+  if (!code || code.length < 4) { toast('Enter the 6-letter code from your friend', 'warn'); return; }
+  if (!wsConnected) { connectWS(); setTimeout(() => joinChallenge(), 1200); return; }
+  wsSend({ type: 'join_challenge', code });
+  toast('Joining challenge…', 'info');
 }
 
 function onGameFound(msg) {

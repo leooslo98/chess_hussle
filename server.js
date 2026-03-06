@@ -82,6 +82,13 @@ const puzzlePools = {
   hard:   { pool: 0, entries: new Map(), activePuzzles: [] },
 };
 
+// Direct friend challenges
+const pendingChallenges = new Map(); // code → { wsId, wager, timeControl, expiresAt }
+
+function generateChallengeCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
 // Lichess live sportsbook state
 // Channel names must match Lichess API exactly (lowercase/camelCase)
 const TRACKED_CHANNELS = ['best', 'bullet', 'blitz', 'rapid', 'classical', 'chess960'];
@@ -812,6 +819,39 @@ wss.on('connection', (ws) => {
         sportsbookWatchers.delete(wsId);
         break;
 
+      case 'join_challenge': {
+        const { code } = msg;
+        const challenge = pendingChallenges.get((code || '').toUpperCase());
+        if (!challenge) { send(wsId, { type: 'error', msg: 'Challenge code not found or expired' }); break; }
+        if (challenge.wsId === wsId) { send(wsId, { type: 'error', msg: "You can't join your own challenge" }); break; }
+        if (Date.now() > challenge.expiresAt) { pendingChallenges.delete(code); send(wsId, { type: 'error', msg: 'Challenge expired' }); break; }
+        pendingChallenges.delete((code || '').toUpperCase());
+
+        const gameId = generateId();
+        const clientA = clients.get(challenge.wsId);
+        const clientB = clients.get(wsId);
+        const game = {
+          id: gameId,
+          players: [challenge.wsId, wsId],
+          colors: { [challenge.wsId]: 'w', [wsId]: 'b' },
+          wager: challenge.wager,
+          timeControl: challenge.timeControl,
+          moves: [],
+          clocks: { w: parseTimeControl(challenge.timeControl), b: parseTimeControl(challenge.timeControl) },
+          lastMoveTs: null,
+          status: 'active',
+          spectatorBets: { white: [], black: [] },
+        };
+        games.set(gameId, game);
+        spectators.set(gameId, new Set());
+        if (clientA) clientA.gameId = gameId;
+        if (clientB) clientB.gameId = gameId;
+
+        send(challenge.wsId, { type: 'game_found', gameId, color: 'w', opponent: clientB?.walletAddress || 'Friend', wager: challenge.wager });
+        send(wsId, { type: 'game_found', gameId, color: 'b', opponent: clientA?.walletAddress || 'Friend', wager: challenge.wager });
+        break;
+      }
+
       case 'enter_daily': {
         const c = clients.get(wsId);
         if (c) c.inDaily = true;
@@ -877,6 +917,23 @@ wss.on('connection', (ws) => {
 });
 
 // ─── REST API ─────────────────────────────────────────────────────────────────
+
+// Friend challenge — create invite code
+app.post('/api/challenge/create', (req, res) => {
+  const { wsId: callerWsId, wager, timeControl } = req.body;
+  // Clean up expired challenges first
+  for (const [code, c] of pendingChallenges) {
+    if (Date.now() > c.expiresAt) pendingChallenges.delete(code);
+  }
+  const code = generateChallengeCode();
+  pendingChallenges.set(code, {
+    wsId: callerWsId,
+    wager: parseFloat(wager) || 0.1,
+    timeControl: timeControl || '5+0',
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+  res.json({ code });
+});
 
 // Live sportsbook state (all tracked channels)
 app.get('/api/sportsbook/live', (req, res) => {
