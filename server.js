@@ -15,6 +15,7 @@ app.use(express.json());
 
 // ─── Serve static HTML ────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'chess-hussle.html'));
 });
 
