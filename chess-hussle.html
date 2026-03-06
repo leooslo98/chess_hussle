@@ -1429,6 +1429,7 @@ function renderBoard(){
 function handleSquareClick(r,c){
   if(gameState.gameOver||gameState.pendingPromo)return;
   if(gameState.isBot&&gameState.turn===gameState.botColor)return;
+  if(gameState.wsGameId&&gameState.turn!==gameState.playerColor)return;
   const lm=gameState.legalMovesCache||getLegalMoves(gameState.board,gameState.turn,gameState.enPassant,gameState.castling);
   gameState.legalMovesCache=lm;
   if(gameState.selected){
@@ -2630,6 +2631,7 @@ function onGameFound(msg) {
   openGame({ player: msg.opponent, wager: msg.wager, time: _queueTC, isWS: true }, parseTimeMinutes(_queueTC));
   gameState.playerColor = msg.color;
   gameState.wsGameId = msg.gameId;
+  renderBoard(); // re-render now that playerColor is correct
 
   toast(`Game found vs ${msg.opponent}! You play ${msg.color === 'w' ? 'White' : 'Black'}`, 'success');
 }
@@ -2661,14 +2663,14 @@ function onRemoteGameOver(msg) {
 }
 
 // Patch executeMove to send WS moves
+// Use assignment (not function declaration) so hoisting doesn't capture the wrong reference
 const _origExecuteMove = executeMove;
-function executeMove(move) {
+executeMove = function(move) {
   _origExecuteMove(move);
-  if (gameState.wsGameId && walletPubkey) {
-    // Only send if it's our turn (before turn switches)
+  if (gameState.wsGameId) {
     wsSend({ type: 'move', gameId: gameState.wsGameId, move });
   }
-}
+};
 
 function refreshLiveGames() {
   if (wsConnected) {
