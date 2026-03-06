@@ -2536,11 +2536,7 @@ document.querySelectorAll('.chip[data-qf]').forEach(c => {
 });
 
 function toggleQueue() {
-  if (!wsConnected) {
-    toast('Connecting to server...', 'warn');
-    connectWS();
-    return;
-  }
+  if (!wsConnected) connectWS();
   if (_queueState.active) {
     leaveQueue();
   } else {
