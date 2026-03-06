@@ -819,6 +819,22 @@ wss.on('connection', (ws) => {
         sportsbookWatchers.delete(wsId);
         break;
 
+      case 'create_challenge': {
+        // Clean expired first
+        for (const [code, c] of pendingChallenges) {
+          if (Date.now() > c.expiresAt) pendingChallenges.delete(code);
+        }
+        const code = generateChallengeCode();
+        pendingChallenges.set(code, {
+          wsId,
+          wager: parseFloat(msg.wager) || 0.1,
+          timeControl: msg.timeControl || '5+0',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
+        send(wsId, { type: 'challenge_created', code });
+        break;
+      }
+
       case 'join_challenge': {
         const { code } = msg;
         const challenge = pendingChallenges.get((code || '').toUpperCase());

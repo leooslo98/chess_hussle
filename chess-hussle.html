@@ -2472,6 +2472,15 @@ function handleWSMessage(msg) {
       updateQueueUI(msg);
       break;
 
+    case 'challenge_created': {
+      const code = msg.code;
+      document.getElementById('challengeCodeTxt').textContent = code;
+      document.getElementById('challengeDisplay').style.display = 'block';
+      try { navigator.clipboard.writeText(code); toast('Code ' + code + ' — copied to clipboard!', 'success'); }
+      catch { toast('Your code: ' + code + ' — share with your friend', 'success'); }
+      break;
+    }
+
     case 'sportsbook_update':
       onSportsbookUpdate(msg);
       break;
@@ -2589,24 +2598,12 @@ function updateQueueUI(msg) {
 }
 
 // ─── Friend Challenge (invite by code) ───────────────────────────
-async function createChallenge() {
-  if (!wsConnected) { toast('Connecting to server…', 'warn'); connectWS(); return; }
+function createChallenge() {
+  if (!wsConnected) { connectWS(); }
   const wager = parseFloat(document.getElementById('playWager').value) || 0.1;
-  try {
-    const r = await fetch('/api/challenge/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wsId, wager, timeControl: _queueTC }),
-    });
-    const data = await r.json();
-    if (!data.code) { toast('Server error — try again', 'error'); return; }
-    document.getElementById('challengeCodeTxt').textContent = data.code;
-    document.getElementById('challengeDisplay').style.display = 'block';
-    try { await navigator.clipboard.writeText(data.code); toast('Code ' + data.code + ' — copied to clipboard!', 'success'); }
-    catch { toast('Code: ' + data.code + ' — share this with your friend', 'success'); }
-  } catch (e) {
-    toast('Could not create challenge', 'error');
-  }
+  wsSend({ type: 'create_challenge', wager, timeControl: _queueTC });
+  document.getElementById('challengeCodeTxt').textContent = '...';
+  document.getElementById('challengeDisplay').style.display = 'block';
 }
 
 function joinChallenge() {
