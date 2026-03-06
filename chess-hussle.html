@@ -2426,7 +2426,7 @@ function connectWS() {
 
   ws.onmessage = (e) => {
     let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
+    try { msg = JSON.parse(e.data); } catch(_) { return; }
     handleWSMessage(msg);
   };
 
@@ -2477,7 +2477,7 @@ function handleWSMessage(msg) {
       document.getElementById('challengeCodeTxt').textContent = code;
       document.getElementById('challengeDisplay').style.display = 'block';
       try { navigator.clipboard.writeText(code); toast('Code ' + code + ' — copied to clipboard!', 'success'); }
-      catch { toast('Your code: ' + code + ' — share with your friend', 'success'); }
+      catch(_) { toast('Your code: ' + code + ' — share with your friend', 'success'); }
       break;
     }
 
