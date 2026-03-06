@@ -3192,7 +3192,7 @@ function createSportsbookCard(ch, msg) {
   card.id = 'sbCard-' + safeId;
   card.innerHTML = `
     <div class="sport-card-header">
-      <div class="sport-title">${sanitizeText(ch)}</div>
+      <div class="sport-title">${sanitizeText(msg.displayName || ch)}</div>
       <div class="sport-live-dot"><div class="lpip"></div>LIVE</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:10px 16px 4px;">

@@ -83,7 +83,16 @@ const puzzlePools = {
 };
 
 // Lichess live sportsbook state
-const TRACKED_CHANNELS = ['Top', 'Bullet', 'Blitz', 'Rapid', 'Classical', 'Chess960'];
+// Channel names must match Lichess API exactly (lowercase/camelCase)
+const TRACKED_CHANNELS = ['best', 'bullet', 'blitz', 'rapid', 'classical', 'chess960'];
+const CHANNEL_DISPLAY = {
+  best:      'Top Game',
+  bullet:    'Bullet',
+  blitz:     'Blitz',
+  rapid:     'Rapid',
+  classical: 'Classical',
+  chess960:  'Chess960',
+};
 const liveSportsbookGames = new Map();   // channelName → { gameId, fen, lastMove, players, clocks, whiteBets, blackBets }
 const sportsbookWatchers = new Set();    // wsIds currently watching sportsbook
 const activeChannelStreams = new Map();  // channelName → AbortController
@@ -357,6 +366,7 @@ function sportsbookPayload(channelName) {
   return {
     type: 'sportsbook_update',
     channelName,
+    displayName: CHANNEL_DISPLAY[channelName] || channelName,
     gameId: g.gameId,
     fen: g.fen,
     lastMove: g.lastMove,
