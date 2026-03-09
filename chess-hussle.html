@@ -1319,6 +1319,7 @@ function openGame(gameData,timeMinutes){
   document.getElementById('reviewBtn').style.display='none';
   document.getElementById('gameStatus').textContent='';
   document.getElementById('turnIndicator').textContent='WHITE TO MOVE';
+  document.getElementById('evalBar').style.display=(gameData&&gameData.isWS)?'none':'block';
   document.getElementById('gameModal').classList.add('open');
   gameState.gameStarted=false;
 }
@@ -1392,6 +1393,9 @@ function renderReviewIfOpen(){
 
 function renderBoard(){
   if(!gameState.board)return;
+  const isFlipped=gameState.playerColor==='b';
+  const gb=document.getElementById('gameBoard');
+  if(gb)gb.style.transform=isFlipped?'rotate(180deg)':'';
   const legalTargets=gameState.selected?(gameState.legalMovesCache||[]).filter(m=>m.from[0]===gameState.selected[0]&&m.from[1]===gameState.selected[1]).map(m=>m.to):[];
   const lastMove=gameState.moveHistory.length>0?gameState.moveHistory[gameState.moveHistory.length-1]:null;
   const tc=themeColors[currentTheme];
@@ -1414,12 +1418,14 @@ function renderBoard(){
     if(piece){
       const wrap=document.createElement('div');
       wrap.style.cssText='width:42px;height:42px;pointer-events:none;user-select:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));';
+      if(isFlipped)wrap.style.transform='rotate(180deg)';
       wrap.innerHTML=PIECE_SVGS[piece]||'';
       sq.appendChild(wrap);
     }
     if(isTarget){
       const dot=document.createElement('div');
       dot.className=piece?'move-dot capture':'move-dot';
+      if(isFlipped)dot.style.transform='rotate(180deg)';
       sq.appendChild(dot);
     }
   }
@@ -1442,7 +1448,9 @@ function handleSquareClick(r,c){
         document.getElementById('promoModal').style.display='block';
         return;
       }
-      executeMove(move);return;
+      executeMove(move);
+      if(gameState.wsGameId&&typeof wsSend==='function')wsSend({type:'move',gameId:gameState.wsGameId,move});
+      return;
     }
   }
   const piece=gameState.board[r][c];
@@ -1456,24 +1464,27 @@ function doPromotion(pieceChar){
   document.getElementById('promoModal').style.display='none';
   gameState.pendingPromo=null;
   executeMove(move);
+  if(gameState.wsGameId&&typeof wsSend==='function')wsSend({type:'move',gameId:gameState.wsGameId,move});
 }
 
 function executeMove(move){
   if(!gameState.gameStarted){gameState.gameStarted=true;startClock();}
   const lm=gameState.legalMovesCache||getLegalMoves(gameState.board,gameState.turn,gameState.enPassant,gameState.castling);
   const algNotation=toAlg(gameState.board,move,lm);
-  let bestScore=null;
-  for(const m of lm){
-    const nb=applyMove(gameState.board,m);
-    const nc=updateCastlingRights(gameState.castling,gameState.board,m);
-    const ne=getNewEnPassant(gameState.board,m);
-    const s=minimax(nb,1,-Infinity,Infinity,gameState.turn!=='w',ne,nc);
-    if(bestScore===null||(gameState.turn==='w'?s>bestScore:s<bestScore))bestScore=s;
+  let bestScore=null,scoreAfter=null;
+  if(!gameState.wsGameId){
+    for(const m of lm){
+      const nb=applyMove(gameState.board,m);
+      const nc=updateCastlingRights(gameState.castling,gameState.board,m);
+      const ne=getNewEnPassant(gameState.board,m);
+      const s=minimax(nb,1,-Infinity,Infinity,gameState.turn!=='w',ne,nc);
+      if(bestScore===null||(gameState.turn==='w'?s>bestScore:s<bestScore))bestScore=s;
+    }
   }
   const newBoard=applyMove(gameState.board,move);
   const newEP=getNewEnPassant(gameState.board,move);
   const newCast=updateCastlingRights(gameState.castling,gameState.board,move);
-  const scoreAfter=minimax(newBoard,1,-Infinity,Infinity,gameState.turn!=='w',newEP,newCast);
+  if(!gameState.wsGameId){scoreAfter=minimax(newBoard,1,-Infinity,Infinity,gameState.turn!=='w',newEP,newCast);}
   const classification=classifyMove(bestScore,scoreAfter,gameState.turn);
   gameState.moveHistory.push({...move,alg:algNotation,color:gameState.turn,bestScore,scoreAfter,classification,boardAfter:cloneBoard(newBoard)});
   gameState.board=newBoard;gameState.enPassant=newEP;gameState.castling=newCast;
@@ -1490,7 +1501,7 @@ function executeMove(move){
   else gameState.halfmove++;
   if(gameState.halfmove>=100){endGame(null,'50move');return;}
   gameState.legalMovesCache=nextLegal;
-  renderBoard();renderMoveList();updateEvalBar(scoreAfter);
+  renderBoard();renderMoveList();if(!gameState.wsGameId)updateEvalBar(scoreAfter);
   document.getElementById('turnIndicator').textContent=nextTurn==='w'?'WHITE TO MOVE':'BLACK TO MOVE';
   document.getElementById('turnIndicator').style.color=nextTurn==='w'?'var(--white)':'var(--muted)';
   if(gameState.isBot&&!gameState.gameOver&&gameState.turn===gameState.botColor){
@@ -2662,15 +2673,6 @@ function onRemoteGameOver(msg) {
   if (!gameState.gameOver) endGame(msg.winner, msg.reason);
 }
 
-// Patch executeMove to send WS moves
-// Use assignment (not function declaration) so hoisting doesn't capture the wrong reference
-const _origExecuteMove = executeMove;
-executeMove = function(move) {
-  _origExecuteMove(move);
-  if (gameState.wsGameId) {
-    wsSend({ type: 'move', gameId: gameState.wsGameId, move });
-  }
-};
 
 function refreshLiveGames() {
   if (wsConnected) {
