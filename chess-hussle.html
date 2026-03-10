@@ -668,51 +668,83 @@ footer{border-top:1px solid var(--border);padding:28px 48px;display:flex;justify
 
 <!-- ════════ VIEW: DAILY CHALLENGE ════════ -->
 <div class="view" id="view-daily">
-  <div class="daily-layout">
-    <div>
+  <div style="padding:64px 48px 48px;min-height:calc(100vh - 96px);">
+    <div style="max-width:1080px;margin:0 auto;">
       <div class="sec-tag">Today's Puzzle</div>
-      <div class="sec-title">DAILY <span>CHALLENGE</span></div>
-      <div style="font-size:11px;color:var(--muted2);margin-bottom:28px;line-height:1.9;">Solve today's Lichess puzzle as fast as possible. Top 3 fastest correct solutions split the pool: 50% / 30% / 20%. Entry fee: 0.05 SOL.</div>
-      <div id="dailyPuzzleArea">
-        <div style="padding:40px;text-align:center;color:var(--muted);" id="dailyLoading">Loading today's puzzle...</div>
-        <div id="dailyBoardArea" style="display:none;">
-          <div id="dailyTurnLabel" style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;"></div>
-          <div class="puzzle-board-wrap">
-            <div>
-              <div id="dailyBoard" style="display:grid;grid-template-columns:repeat(8,51px);grid-template-rows:repeat(8,51px);width:408px;height:408px;border:1px solid rgba(255,255,255,.06);box-shadow:0 4px 40px rgba(0,0,0,.9);"></div>
+      <div class="sec-title" style="margin-bottom:8px;">DAILY <span>CHALLENGE</span></div>
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:32px;line-height:1.8;">Solve the daily chess puzzle as fast as possible. Top 3 fastest correct solutions split the prize pool. Entry: 0.05 SOL.</div>
+
+      <!-- Loading state -->
+      <div id="dailyLoading" style="padding:48px;text-align:center;color:var(--muted);font-size:11px;letter-spacing:2px;">LOADING PUZZLE...</div>
+
+      <!-- Main puzzle area (hidden until loaded) -->
+      <div id="dailyBoardArea" style="display:none;">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:start;">
+
+          <!-- LEFT: Board column -->
+          <div>
+            <!-- Puzzle prompt bar (like chess.com) -->
+            <div id="dailyPrompt" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-bottom:none;padding:14px 18px;">
+              <div id="dailyColorDot" style="width:18px;height:18px;border-radius:50%;background:var(--muted);flex-shrink:0;"></div>
+              <div>
+                <div id="dailyPromptTitle" style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">Daily Challenge</div>
+                <div id="dailyPromptText" style="font-size:13px;color:var(--white);font-weight:500;">Find the best move</div>
+              </div>
+            </div>
+
+            <!-- Board with rank/file labels -->
+            <div style="display:flex;gap:4px;">
+              <div id="dailyRankLabels" style="display:flex;flex-direction:column;justify-content:space-around;padding:0 4px;"></div>
+              <div>
+                <div id="dailyBoard" style="display:grid;grid-template-columns:repeat(8,51px);grid-template-rows:repeat(8,51px);width:408px;height:408px;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 48px rgba(0,0,0,.8);"></div>
+                <div id="dailyFileLabels" style="display:flex;justify-content:space-around;padding:4px 0;"></div>
+              </div>
+            </div>
+
+            <!-- Feedback bar -->
+            <div id="dailyFeedback" style="min-height:48px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);border-top:none;padding:12px 18px;font-size:11px;letter-spacing:1px;color:var(--muted);">Click a piece to begin</div>
+
+            <!-- Timer + actions -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:12px;">
+              <div id="dailyTimer" class="daily-timer" style="display:none;">0.0s</div>
+              <div style="display:flex;gap:8px;flex:1;justify-content:flex-end;" id="dailyActions">
+                <button class="btn-gold" id="dailyEnterBtn" onclick="enterDailyChallenge()">Enter — 0.05 SOL</button>
+                <button class="btn-out" onclick="loadDailyPuzzle()">&#8635;</button>
+              </div>
             </div>
           </div>
-          <div style="margin-top:16px;display:flex;gap:8px;align-items:center;justify-content:center;">
-            <div class="daily-timer" id="dailyTimer">0.0s</div>
+
+          <!-- RIGHT: Info panel -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <!-- Prize pool -->
+            <div class="daily-card">
+              <div class="daily-pool-display">
+                <div class="daily-pool-amt" id="dailyPoolAmt">0.000</div>
+                <div class="daily-pool-label">SOL Prize Pool</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">Entries Today</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--white);" id="dailyEntryCount">0</div>
+              </div>
+              <div style="padding:12px;background:var(--surface2);border:1px solid var(--border);font-size:10px;color:var(--muted);line-height:2;">
+                <div style="color:var(--gold);margin-bottom:4px;">Prize breakdown</div>
+                🥇 1st fastest: 50%<br>
+                🥈 2nd fastest: 30%<br>
+                🥉 3rd fastest: 20%
+              </div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="daily-card">
+              <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Today's Leaderboard</div>
+              <div class="leaderboard" id="dailyLeaderboard">
+                <div style="font-size:10px;color:var(--muted);padding:8px 0;">No solutions yet</div>
+              </div>
+            </div>
           </div>
-          <div style="margin-top:12px;text-align:center;font-size:11px;color:var(--muted);" id="dailyStatus"></div>
+
         </div>
-      </div>
-      <div style="margin-top:24px;display:flex;gap:12px;" id="dailyActions">
-        <button class="btn-gold" id="dailyEnterBtn" onclick="enterDailyChallenge()">Enter — 0.05 SOL</button>
-        <button class="btn-out" onclick="loadDailyPuzzle()">&#8635; Refresh</button>
-      </div>
-    </div>
-    <div>
-      <div class="daily-card">
-        <div class="daily-pool-display">
-          <div class="daily-pool-amt" id="dailyPoolAmt">0.00</div>
-          <div class="daily-pool-label">SOL Prize Pool</div>
-        </div>
-        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Entries Today</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--white);margin-bottom:20px;" id="dailyEntryCount">0</div>
-        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Top Times</div>
-        <div class="leaderboard" id="dailyLeaderboard">
-          <div style="font-size:10px;color:var(--muted);padding:8px 0;">No solutions yet today</div>
-        </div>
-        <div style="margin-top:20px;padding:12px;background:var(--surface2);border:1px solid var(--border);font-size:10px;color:var(--muted);line-height:1.8;">
-          <div style="color:var(--gold);margin-bottom:4px;">Prize breakdown</div>
-          1st fastest: 50% of pool<br>
-          2nd fastest: 30% of pool<br>
-          3rd fastest: 20% of pool<br>
-          Wrong or timed out: no refund
-        </div>
-      </div>
+      </div><!-- end dailyBoardArea -->
     </div>
   </div>
 </div>
@@ -2801,13 +2833,17 @@ function onSpectateOk(msg) {
 // ═══════════════════════════════════════════════════════════════════
 // DAILY CHALLENGE
 // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// DAILY PUZZLE
+// ═══════════════════════════════════════════════════════════════════
 let _dailyPuzzle = null;
 let _dailyEntered = false;
 let _dailyStarted = false;
 let _dailyTimerInterval = null;
 let _dailyStartTs = null;
+let _dailyFlipped = false; // board orientation for solver
 
-// Puzzle board state
+// Puzzle board state (shared with buy-in puzzles)
 let _puzzleBoard = null;
 let _puzzleTurn = 'w';
 let _puzzleSolution = [];
@@ -2815,23 +2851,70 @@ let _puzzleSolveIdx = 0;
 let _puzzleSelected = null;
 let _activePuzzleId = null;
 
+// ── Parse SAN moves from chess.com PGN string ───────────────────────
+function parsePGNMoves(pgn) {
+  // Strip header tags like [FEN "..."], [White "..."] etc.
+  const movesSection = pgn.replace(/\[[^\]]*\]/g, '').trim();
+  // Split on whitespace, remove move numbers (1. 2. ...) and results
+  return movesSection.split(/\s+/).filter(t =>
+    t && !/^\d+\./.test(t) && !['*', '1-0', '0-1', '1/2-1/2'].includes(t)
+  );
+}
+
+// ── Convert SAN notation to a move object via reverse toAlg() ───────
+function sanToMove(board, legalMoves, san) {
+  const cleanSan = san.replace(/[+#!?]/g, '');
+  // Handle castling
+  if (cleanSan === 'O-O' || cleanSan === '0-0') return legalMoves.find(m => m.castle === 'K') || null;
+  if (cleanSan === 'O-O-O' || cleanSan === '0-0-0') return legalMoves.find(m => m.castle === 'Q') || null;
+  for (const move of legalMoves) {
+    if (toAlg(board, move, legalMoves) === cleanSan) return move;
+  }
+  return null;
+}
+
+// ── Build UCI solution array from chess.com FEN + PGN ───────────────
+function computeSolutionFromPGN(fen, pgn) {
+  const sanMoves = parsePGNMoves(pgn);
+  let board = fenToBoard(fen);
+  let turn = fen.split(' ')[1] === 'w' ? 'w' : 'b';
+  const solution = [];
+  for (const san of sanMoves) {
+    const lm = getLegalMoves(board, turn, null, {wK:true,wQ:true,bK:true,bQ:true});
+    const move = sanToMove(board, lm, san);
+    if (!move) break;
+    solution.push(coordsToAlgebraic(move));
+    board = applyMove(board, move);
+    turn = turn === 'w' ? 'b' : 'w';
+  }
+  return solution;
+}
+
 async function loadDailyPuzzle() {
   const loading = document.getElementById('dailyLoading');
   const boardArea = document.getElementById('dailyBoardArea');
-  if (loading) loading.style.display = 'block';
+  if (loading) { loading.style.display = 'block'; loading.textContent = 'LOADING PUZZLE...'; }
   if (boardArea) boardArea.style.display = 'none';
 
   try {
     const res = await fetch('/api/daily/puzzle');
-    if (!res.ok) throw new Error('Failed to load puzzle');
+    if (!res.ok) throw new Error('Server error ' + res.status);
     const data = await res.json();
+    if (!data.puzzle || !data.puzzle.fen) throw new Error('No puzzle data');
     _dailyPuzzle = data.puzzle;
-    updateDailyState({ puzzle: data.puzzle, pool: data.pool, entries: data.entries, topTimes: data.topTimes });
+
+    // Compute solution from PGN on client side (we have the chess engine here)
+    _puzzleSolution = computeSolutionFromPGN(_dailyPuzzle.fen, _dailyPuzzle.pgn || '');
+
+    updateDailyState({ pool: data.pool, entries: data.entries, topTimes: data.topTimes });
     if (loading) loading.style.display = 'none';
     if (boardArea) boardArea.style.display = 'block';
     renderDailyBoard();
   } catch (e) {
-    if (loading) loading.textContent = 'Could not load puzzle — server may be offline';
+    if (loading) {
+      loading.textContent = 'Could not load puzzle — tap Refresh to try again';
+      loading.style.display = 'block';
+    }
   }
 }
 
@@ -2841,13 +2924,9 @@ function updateDailyState(msg) {
   const lbEl = document.getElementById('dailyLeaderboard');
   if (poolEl) poolEl.textContent = (msg.pool || 0).toFixed(3);
   if (entryEl) entryEl.textContent = msg.entries || 0;
-  if (_dailyPuzzle !== msg.puzzle && msg.puzzle) {
-    _dailyPuzzle = msg.puzzle;
-    renderDailyBoard();
-  }
   if (lbEl && msg.topTimes) {
     if (!msg.topTimes.length) {
-      lbEl.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;">No solutions yet today</div>';
+      lbEl.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;">No solutions yet</div>';
     } else {
       lbEl.innerHTML = msg.topTimes.map((t, i) => `
         <div class="lb-row">
@@ -2862,14 +2941,49 @@ function updateDailyState(msg) {
 function renderDailyBoard() {
   if (!_dailyPuzzle) return;
   _puzzleBoard = fenToBoard(_dailyPuzzle.fen);
-  _puzzleSolution = _dailyPuzzle.moves || [];
   _puzzleSolveIdx = 0;
   _puzzleTurn = _dailyPuzzle.fen.split(' ')[1] === 'w' ? 'w' : 'b';
+  _dailyFlipped = _puzzleTurn === 'b'; // solver sees their pieces at bottom
   _puzzleSelected = null;
 
+  // Update prompt bar
+  const dot = document.getElementById('dailyColorDot');
+  const title = document.getElementById('dailyPromptTitle');
+  const prompt = document.getElementById('dailyPromptText');
+  if (dot) dot.style.background = _puzzleTurn === 'w' ? '#f0ebe0' : '#1a1a1a';
+  if (dot) dot.style.border = _puzzleTurn === 'b' ? '2px solid #555' : 'none';
+  if (title) title.textContent = _dailyPuzzle.title || 'Daily Challenge';
+  if (prompt) prompt.textContent = `${_puzzleTurn === 'w' ? 'White' : 'Black'} to move — find the winning continuation`;
+
+  // Build rank/file labels
+  const rankEl = document.getElementById('dailyRankLabels');
+  const fileEl = document.getElementById('dailyFileLabels');
+  if (rankEl) {
+    rankEl.innerHTML = '';
+    for (let r = 0; r < 8; r++) {
+      const el = document.createElement('span');
+      el.style.cssText = 'display:flex;align-items:center;justify-content:center;height:51px;width:16px;font-size:9px;color:rgba(255,255,255,.3);user-select:none;';
+      el.textContent = _dailyFlipped ? r + 1 : 8 - r;
+      rankEl.appendChild(el);
+    }
+  }
+  if (fileEl) {
+    fileEl.innerHTML = '';
+    const files = _dailyFlipped ? 'hgfedcba' : 'abcdefgh';
+    for (const f of files) {
+      const el = document.createElement('span');
+      el.style.cssText = 'display:flex;align-items:center;justify-content:center;width:51px;height:16px;font-size:9px;color:rgba(255,255,255,.3);user-select:none;';
+      el.textContent = f;
+      fileEl.appendChild(el);
+    }
+  }
+
+  // Build board squares
   const boardEl = document.getElementById('dailyBoard');
   if (!boardEl) return;
   boardEl.innerHTML = '';
+  boardEl.style.transform = _dailyFlipped ? 'rotate(180deg)' : '';
+
   for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
     const sq = document.createElement('div');
     sq.id = `dsq-${r}-${c}`;
@@ -2878,38 +2992,79 @@ function renderDailyBoard() {
     sq.addEventListener('click', () => handleDailySquareClick(r, c));
     boardEl.appendChild(sq);
   }
-  renderDailyBoardPieces();
-  const turnLabel = document.getElementById('dailyTurnLabel');
-  if (turnLabel) turnLabel.textContent = `${_puzzleTurn === 'w' ? 'White' : 'Black'} to move`;
+
+  renderDailyPieces();
+  setDailyFeedback(_dailyEntered ? 'Click a piece to begin' : 'Enter to start solving', 'neutral');
 }
 
-function renderDailyBoardPieces() {
+function renderDailyPieces(lastFrom, lastTo) {
   if (!_puzzleBoard) return;
   const tc = themeColors[currentTheme];
+  const lm = _puzzleSelected
+    ? getLegalMoves(_puzzleBoard, _puzzleTurn, null, {wK:true,wQ:true,bK:true,bQ:true})
+        .filter(m => m.from[0]===_puzzleSelected[0] && m.from[1]===_puzzleSelected[1])
+    : [];
+
   for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
     const sq = document.getElementById(`dsq-${r}-${c}`);
     if (!sq) continue;
     const isLight = (r+c)%2===0;
-    sq.style.background = isLight ? tc.light : tc.dark;
+    const isSel = _puzzleSelected && _puzzleSelected[0]===r && _puzzleSelected[1]===c;
+    const isTarget = lm.some(m => m.to[0]===r && m.to[1]===c);
+    const isLast = (lastFrom && lastFrom[0]===r && lastFrom[1]===c) || (lastTo && lastTo[0]===r && lastTo[1]===c);
+
+    sq.style.background = isSel
+      ? (tc.lightHl||'rgba(201,168,76,.75)')
+      : isLast ? (isLight ? (tc.lightLast||'rgba(201,168,76,.4)') : (tc.darkLast||'rgba(201,168,76,.3)'))
+      : isLight ? tc.light : tc.dark;
+
     sq.innerHTML = '';
     const p = _puzzleBoard[r][c];
     if (p) {
       const wrap = document.createElement('div');
       wrap.style.cssText = 'width:42px;height:42px;pointer-events:none;user-select:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));';
+      if (_dailyFlipped) wrap.style.transform = 'rotate(180deg)';
       wrap.innerHTML = PIECE_SVGS[p] || '';
       sq.appendChild(wrap);
+    }
+    if (isTarget) {
+      const dot = document.createElement('div');
+      dot.className = p ? 'move-dot capture' : 'move-dot';
+      if (_dailyFlipped) dot.style.transform = 'rotate(180deg)';
+      sq.appendChild(dot);
     }
   }
 }
 
+function flashDailySquare(r, c, color) {
+  const sq = document.getElementById(`dsq-${r}-${c}`);
+  if (!sq) return;
+  const orig = sq.style.background;
+  sq.style.background = color === 'green' ? 'rgba(62,207,142,.6)' : 'rgba(245,101,101,.6)';
+  sq.style.transition = 'background 0s';
+  setTimeout(() => { sq.style.background = orig; sq.style.transition = 'background 0.4s'; }, 400);
+}
+
+function setDailyFeedback(text, type) {
+  const el = document.getElementById('dailyFeedback');
+  if (!el) return;
+  const colors = { neutral: 'var(--muted)', correct: 'var(--green)', wrong: 'var(--red)', solved: 'var(--gold)' };
+  el.textContent = text;
+  el.style.color = colors[type] || colors.neutral;
+}
+
 function handleDailySquareClick(r, c) {
-  if (!_dailyEntered) { toast('Enter the challenge first', 'warn'); return; }
+  if (!_dailyEntered) { toast('Click "Enter" to start solving', 'warn'); return; }
   if (!_dailyStarted) {
     _dailyStarted = true;
     _dailyStartTs = Date.now();
+    const timer = document.getElementById('dailyTimer');
+    if (timer) timer.style.display = 'block';
     startDailyTimer();
     if (wsConnected) wsSend({ type: 'daily_start', walletAddress: walletPubkey?.toString() });
   }
+  if (_puzzleSolveIdx >= _puzzleSolution.length) return; // already solved
+
   const piece = _puzzleBoard[r][c];
   const lm = getLegalMoves(_puzzleBoard, _puzzleTurn, null, {wK:true,wQ:true,bK:true,bQ:true});
 
@@ -2917,71 +3072,59 @@ function handleDailySquareClick(r, c) {
     const move = lm.find(m => m.from[0]===_puzzleSelected[0] && m.from[1]===_puzzleSelected[1] && m.to[0]===r && m.to[1]===c);
     if (move) {
       const moveStr = coordsToAlgebraic(move);
-      checkDailyMove(moveStr, move);
+      const prevSel = _puzzleSelected;
       _puzzleSelected = null;
-      renderDailyBoardPieces();
+      checkDailyMove(moveStr, move, prevSel, [r, c]);
       return;
     }
   }
   _puzzleSelected = (piece && piece[0] === _puzzleTurn) ? [r, c] : null;
-  renderDailyBoardHighlight();
+  renderDailyPieces();
 }
 
-function renderDailyBoardHighlight() {
-  const tc = themeColors[currentTheme];
-  const lm = _puzzleSelected ? getLegalMoves(_puzzleBoard, _puzzleTurn, null, {wK:true,wQ:true,bK:true,bQ:true}).filter(m=>m.from[0]===_puzzleSelected[0]&&m.from[1]===_puzzleSelected[1]) : [];
-  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
-    const sq = document.getElementById(`dsq-${r}-${c}`);
-    if (!sq) continue;
-    const isLight = (r+c)%2===0;
-    const isSel = _puzzleSelected && _puzzleSelected[0]===r && _puzzleSelected[1]===c;
-    const isTarget = lm.some(m => m.to[0]===r && m.to[1]===c);
-    sq.style.background = isSel ? (tc.lightHl||'rgba(201,168,76,.75)') : isTarget ? (isLight ? tc.lightLast : tc.darkLast) : (isLight ? tc.light : tc.dark);
-    // Re-add move dots
-    const existing = sq.querySelector('.move-dot');
-    if (existing) existing.remove();
-    if (isTarget) {
-      const dot = document.createElement('div');
-      dot.className = _puzzleBoard[r][c] ? 'move-dot capture' : 'move-dot';
-      sq.appendChild(dot);
-    }
-  }
-}
-
-function checkDailyMove(moveStr, move) {
+function checkDailyMove(moveStr, move, fromCoords, toCoords) {
   const expected = _puzzleSolution[_puzzleSolveIdx];
   const correct = normalizeMove(moveStr) === normalizeMove(expected);
+
   if (correct) {
+    flashDailySquare(toCoords[0], toCoords[1], 'green');
     _puzzleBoard = applyMove(_puzzleBoard, move);
     _puzzleTurn = _puzzleTurn === 'w' ? 'b' : 'w';
     _puzzleSolveIdx++;
-    renderDailyBoardPieces();
+    renderDailyPieces(fromCoords, toCoords);
+
     if (_puzzleSolveIdx >= _puzzleSolution.length) {
-      // Puzzle solved!
+      // Solved!
       const timeMs = Date.now() - _dailyStartTs;
       stopDailyTimer();
-      document.getElementById('dailyStatus').textContent = `Solved in ${(timeMs/1000).toFixed(1)}s!`;
-      document.getElementById('dailyStatus').style.color = 'var(--green)';
+      setDailyFeedback(`Solved in ${(timeMs/1000).toFixed(1)}s! `, 'solved');
+      const timerEl = document.getElementById('dailyTimer');
+      if (timerEl) timerEl.style.color = 'var(--gold)';
       toast(`Puzzle solved in ${(timeMs/1000).toFixed(1)}s!`, 'success');
       if (wsConnected) wsSend({ type: 'puzzle_solve', puzzleId: 'daily', move: moveStr, timeMs, walletAddress: walletPubkey?.toString() });
     } else {
-      // Apply opponent's next move from solution
+      setDailyFeedback('Correct! Keep going...', 'correct');
+      // Auto-play opponent's forced response after 500ms
       setTimeout(() => {
-        const oppMoveStr = _puzzleSolution[_puzzleSolveIdx];
+        const oppStr = _puzzleSolution[_puzzleSolveIdx];
         const oppLm = getLegalMoves(_puzzleBoard, _puzzleTurn, null, {wK:true,wQ:true,bK:true,bQ:true});
-        const oppMove = findMoveFromStr(_puzzleBoard, oppLm, oppMoveStr, _puzzleTurn);
+        const oppMove = findMoveFromStr(_puzzleBoard, oppLm, oppStr, _puzzleTurn);
         if (oppMove) {
           _puzzleBoard = applyMove(_puzzleBoard, oppMove);
           _puzzleTurn = _puzzleTurn === 'w' ? 'b' : 'w';
           _puzzleSolveIdx++;
-          renderDailyBoardPieces();
+          renderDailyPieces(oppMove.from, oppMove.to);
+          if (_puzzleSolveIdx < _puzzleSolution.length) {
+            setDailyFeedback('Your turn — find the winning move', 'neutral');
+          }
         }
-      }, 400);
+      }, 500);
     }
   } else {
-    document.getElementById('dailyStatus').textContent = 'Wrong move — try again';
-    document.getElementById('dailyStatus').style.color = 'var(--red)';
-    setTimeout(() => { document.getElementById('dailyStatus').textContent = ''; }, 1500);
+    flashDailySquare(toCoords[0], toCoords[1], 'red');
+    setDailyFeedback('Not the best move — try again', 'wrong');
+    setTimeout(() => setDailyFeedback('Find the winning continuation', 'neutral'), 1500);
+    renderDailyPieces();
   }
 }
 
@@ -3005,15 +3148,13 @@ function stopDailyTimer() {
 async function enterDailyChallenge() {
   if (!walletPubkey) { toast('Connect wallet first', 'warn'); return; }
   if (_dailyEntered) { toast('Already entered', 'warn'); return; }
+  if (!_dailyPuzzle) { toast('Puzzle still loading — wait a moment', 'warn'); return; }
   _dailyEntered = true;
   document.getElementById('dailyEnterBtn').textContent = 'Entered!';
   document.getElementById('dailyEnterBtn').disabled = true;
-  if (wsConnected) {
-    wsSend({ type: 'enter_daily', walletAddress: walletPubkey.toString() });
-  } else {
-    toast('Server offline — puzzle available but pool is disconnected', 'warn');
-  }
-  toast('Entered daily challenge! Solve as fast as you can.', 'success');
+  if (wsConnected) wsSend({ type: 'enter_daily', walletAddress: walletPubkey.toString() });
+  setDailyFeedback('Click a piece to start your timer!', 'correct');
+  toast('Entered! Timer starts on your first move.', 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════════

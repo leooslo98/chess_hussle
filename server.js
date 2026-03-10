@@ -508,17 +508,18 @@ async function getDailyPuzzle() {
   const today = todayStr();
   if (dailyPuzzleCache && dailyPuzzleDate === today) return dailyPuzzleCache;
   try {
-    const res = await fetch('https://lichess.org/api/puzzle/daily', {
-      headers: { Accept: 'application/json' },
+    // chess.com public puzzle API returns FEN directly — no parsing needed
+    const res = await fetch('https://api.chess.com/pub/puzzle', {
+      headers: { Accept: 'application/json', 'User-Agent': 'ChessHussle/1.0' },
     });
-    if (!res.ok) throw new Error('Lichess puzzle API returned ' + res.status);
+    if (!res.ok) throw new Error('Chess.com puzzle API returned ' + res.status);
     const data = await res.json();
+    if (!data.fen) throw new Error('No FEN in response');
     dailyPuzzleCache = {
-      id: data.puzzle.id,
-      fen: data.game.fen,
-      moves: data.puzzle.solution,
-      rating: data.puzzle.rating,
-      initialMove: data.game.pgn ? data.game.pgn.split(' ').pop() : null,
+      fen: data.fen,
+      pgn: data.pgn || '',
+      title: data.title || 'Daily Challenge',
+      url: data.url || '',
     };
     dailyPuzzleDate = today;
 
